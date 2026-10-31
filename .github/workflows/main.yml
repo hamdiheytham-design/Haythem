@@ -1,0 +1,61 @@
+name: Driver Pro APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Project
+        run: |
+          if ! find . -name settings.gradle -o -name settings.gradle.kts | grep -q .; then
+            mkdir -p project
+            for f in *.zip; do
+              if [ -f "$f" ]; then
+                unzip -o "$f" -d project
+              fi
+            done
+          fi
+
+      - name: Locate Android Project
+        run: |
+          PROJECT_DIR=$(find . -name settings.gradle -o -name settings.gradle.kts | head -1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$PROJECT_DIR")" >> $GITHUB_ENV
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Driver-Pro-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
